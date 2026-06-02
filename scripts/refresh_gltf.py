@@ -21,7 +21,6 @@ After running, commit the resulting `gltf/**` files to this repo.
 
 from __future__ import annotations
 
-import argparse
 import shutil
 import sys
 import urllib.error
@@ -74,49 +73,26 @@ def download(url: str, dst: Path) -> bool:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--flat",
-        action="store_true",
-        help=(
-            "Flatten output: place each .gltf/.glb directly in gltf/ "
-            "(loses any external .bin/.png dependencies — not recommended for "
-            ".gltf+bin variants)."
-        ),
-    )
-    args = parser.parse_args()
-
     TARGET_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Target directory: {TARGET_DIR}")
 
+    # Each sample lives in its own subdirectory under TARGET_DIR so the
+    # .gltf and its sidecar .bin / .png stay together — the importer
+    # resolves buffer URIs relative to the .gltf, so flattening would
+    # orphan external buffers. The taxila3d-rust fixture loader walks
+    # the format dir recursively.
     ok = 0
     fail = 0
     for display, urls in SAMPLES:
         for rel in urls:
             url = GH_BASE + rel
             local_name = Path(rel).name
-            if args.flat:
-                dst = TARGET_DIR / local_name
-            else:
-                # Preserve directory structure under TARGET_DIR/display/...
-                dst = TARGET_DIR / display / local_name
+            dst = TARGET_DIR / display / local_name
             if download(url, dst):
                 ok += 1
                 print(f"  OK   {display}/{local_name}  ({dst.stat().st_size // 1024} KiB)")
             else:
                 fail += 1
-        # Also drop a top-level entry-point copy so list_fixtures
-        # (which globs the format dir for *.gltf|*.glb at depth 1) finds it.
-        if not args.flat:
-            entry = TARGET_DIR / display / Path(urls[0]).name
-            if entry.exists():
-                shortcut = TARGET_DIR / f"{display}{entry.suffix}"
-                if not shortcut.exists():
-                    try:
-                        # Copy (not symlink) for Windows compatibility.
-                        shutil.copy2(entry, shortcut)
-                    except OSError as e:
-                        print(f"  shortcut FAIL {shortcut.name}: {e}", file=sys.stderr)
 
     print(f"\nDone. {ok} OK, {fail} failed.")
     if ok < 10:
