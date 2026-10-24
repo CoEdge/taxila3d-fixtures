@@ -1,0 +1,4 @@
+# STEP fixtures are byte-stable across platforms: refresh_step_subset.py
+# writes LF, and step/CREDITS.csv records each file's size, so a CRLF
+# checkout would silently disagree with its own manifest.
+*.step text eol=lf
